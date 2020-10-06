@@ -13,12 +13,12 @@ ___INFO___
   "id": "cvt_temp_public_id",
   "version": 1,
   "securityGroups": [],
-  "displayName": "FacebookClient",
+  "displayName": "Facebook Conversions API Client",
   "brand": {
     "id": "brand_dummy",
     "displayName": "Facebook"
   },
-  "description": "Facebook Client(Serverside) Template that can be run on Google Container to fire events to be consumed by Facebook Tag(Serverside)",
+  "description": "A server-side client template that listens and translates event information from the Facebook Pixel Library.",
   "containerContexts": [
     "SERVER"
   ]
@@ -116,14 +116,6 @@ if(requestPath === '/tr') {
   });
 
   logToConsole('Processed /tr event!');
-}
-
-// Processing unit for Phase 2 events fired from gtm.js.
-if(requestPath == '/collect') {
-
-  logToConsole('Processing /collect event: ');
-
-  //todo: Add eventModel mapping for /collect payload.
 }
 
 
