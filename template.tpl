@@ -67,6 +67,7 @@ if(requestPath === '/tr') {
   eventModel.event_time = makeInteger(params.ts/1000);
   eventModel.event_id = params.eid;
   eventModel.page_location = params.dl;
+  if(params.test_event_code) eventModel.test_event_code = params.test_event_code;
 
   // Based on GTM common event data parameters -- https://developers.google.com/tag-manager/serverside/common-event-data
   eventModel.ip_override = getRemoteAddress();
@@ -326,12 +327,14 @@ setup: |-
     search_string: 'query',
     status: 'subscribed',
     delivery_category: 'in_store',
+    test_event_code: '123',
   };
 
   const testTrackingRequest = {
     ev: testData.event_name,
     ts: testData.time_stamp,
     eid: testData.event_id,
+    test_event_code: testData.test_event_code,
     dl: testData.dl,
     'ud[em]' : testData.email,
     'ud[ph]' : testData.phone_number,
@@ -366,6 +369,7 @@ setup: |-
     'page_location': testData.dl,
     'ip_override': testData.ip_address,
     'user_agent': testData.user_agent,
+    'test_event_code': testData.test_event_code,
 
     // user data section
     'x-fb-ud-em': testData.email,
