@@ -2,5 +2,5 @@ homepage: "https://facebook.com"
 documentation: "https://developers.facebook.com/docs/marketing-api/conversions-api"
 versions:
   # Initial Version for Conversions API Client
-  - sha: a58e9881c36e86433477c49930c2f04d4950a42e
+  - sha: 92d0a8d837cb985b2a1a80c5eacbfff90ab2654d
     changeNotes: Adding support for converting Facebook Pixel event schema to common event model.
