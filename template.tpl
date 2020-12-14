@@ -35,22 +35,63 @@ ___SANDBOXED_JS_FOR_SERVER___
 
 // Imports for Sandboxed Javascript.
 const claimRequest = require('claimRequest');
-const returnResponse = require('returnResponse');
 const getRemoteAddress = require('getRemoteAddress');
+const getRequestBody = require('getRequestBody');
 const getRequestHeader = require('getRequestHeader');
 const getRequestMethod = require('getRequestMethod');
-const getRequestBody = require('getRequestBody');
-const getRequestQueryParameters = require('getRequestQueryParameters');
 const getRequestPath = require('getRequestPath');
-const setPixelResponse = require('setPixelResponse');
-const runContainer = require('runContainer');
+const getRequestQueryParameters = require('getRequestQueryParameters');
+const getTimestampMillis = require('getTimestampMillis');
+const JSON = require('JSON');
 const logToConsole = require('logToConsole');
 const makeInteger = require('makeInteger');
-const JSON = require('JSON');
-
 const requestPath = getRequestPath();
+const returnResponse = require('returnResponse');
+const runContainer = require('runContainer');
+const sendHttpGet = require('sendHttpGet');
+const setPixelResponse = require('setPixelResponse');
+const setResponseBody = require('setResponseBody');
+const setResponseHeader = require('setResponseHeader');
+const setResponseStatus = require('setResponseStatus');
+const templateDataStorage = require('templateDataStorage');
 
 // Processing unit for Phase 1 events fired from fbevents.js
+
+const proxyResponse = (response, headers, statusCode) => {
+  setResponseStatus(statusCode);
+  setResponseBody(response);
+  for (const key in headers) {
+    setResponseHeader(key, headers[key]);
+  }
+  returnResponse();
+};
+
+if(requestPath === '/en_US/fbevents.js') {
+  logToConsole('Processing /en_US/fbevents.js request...');
+
+  claimRequest();
+  const now = getTimestampMillis();
+  const twenty_minutes_ago = now - (20 * 60 * 1000);
+  if (templateDataStorage.getItemCopy('fbevents_js') == null || templateDataStorage.getItemCopy('fbevents_stored_at') < twenty_minutes_ago) {
+    sendHttpGet('https://connect.facebook.net/en_US/fbevents.js', (statusCode, headers, body) => {
+      if (statusCode === 200) {
+        templateDataStorage.setItemCopy('fbevents_js', body);
+        templateDataStorage.setItemCopy('fbevents_headers', headers);
+        templateDataStorage.setItemCopy('fbevents_stored_at', now);
+      }
+      proxyResponse(body, headers, statusCode);
+    }, {timeout: 5000});
+  } else {
+    proxyResponse(
+      templateDataStorage.getItemCopy('fbevents_js'),
+      templateDataStorage.getItemCopy('fbevents_headers'),
+      200
+    );
+  }
+
+  logToConsole('Processed /en_US/fbevents.js request.');
+}
+
 if(requestPath === '/tr') {
   let params;
 
@@ -227,6 +268,49 @@ ___SERVER_PERMISSIONS___
       "param": []
     },
     "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_template_storage",
+        "versionId": "1"
+      },
+      "param": []
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "send_http",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "allowedUrls",
+          "value": {
+            "type": 1,
+            "string": "specific"
+          }
+        },
+        {
+          "key": "urls",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "https://connect.facebook.net/*"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
   }
 ]
 
@@ -288,6 +372,85 @@ scenarios:
     // Assert
     assertApi('claimRequest').wasNotCalled();
     assertApi('runContainer').wasNotCalled();
+- name: Client proxies requests for fbevents JS when it isn't cached
+  code: |-
+    mock('getRequestPath', () => {
+      return '/en_US/fbevents.js';
+    });
+
+    runCode(mockConfigurationData);
+
+    const expectedBody = 'const events = "js";';
+    const expectedStatusCode = 200;
+    const expectedHeaders = {
+      'header-key1': 'value1',
+      'header-key2': 'value2',
+    };
+    capturedGetHandler(expectedStatusCode, expectedHeaders, expectedBody);
+
+    assertApi('claimRequest').wasCalled();
+    assertThat(actualGetUrl).isEqualTo('https://connect.facebook.net/en_US/fbevents.js');
+    assertThat(actualOptions).isEqualTo({timeout: 5000});
+    assertApi('setResponseStatus').wasCalledWith(expectedStatusCode);
+    assertApi('setResponseBody').wasCalledWith(expectedBody);
+    assertApi('setResponseHeader').wasCalledWith('header-key1', 'value1');
+    assertApi('setResponseHeader').wasCalledWith('header-key2', 'value2');
+    assertApi('returnResponse').wasCalled();
+    assertThat(templateDataStorage.getItemCopy('fbevents_stored_at')).isEqualTo(currentTimeMillis);
+    assertThat(templateDataStorage.getItemCopy('fbevents_js')).isEqualTo(expectedBody);
+    assertThat(templateDataStorage.getItemCopy('fbevents_headers')).isEqualTo(expectedHeaders);
+- name: Client returns cached fbevents JS
+  code: |
+    mock('getRequestPath', () => {
+      return '/en_US/fbevents.js';
+    });
+
+    const expectedCachedJS = 'const events = "js";';
+    const expectedCachedHeaders = {'k1': 'v1', 'k2': 'v2'};
+    templateDataStorage.setItemCopy('fbevents_stored_at', currentTimeMillis);
+    templateDataStorage.setItemCopy('fbevents_js', expectedCachedJS);
+    templateDataStorage.setItemCopy('fbevents_headers', expectedCachedHeaders);
+
+    runCode(mockConfigurationData);
+
+    assertApi('claimRequest').wasCalled();
+    assertApi('sendHttpGet').wasNotCalled();
+    assertApi('setResponseStatus').wasCalledWith(200);
+    assertApi('setResponseBody').wasCalledWith(expectedCachedJS);
+    assertApi('setResponseHeader').wasCalledWith('k1', 'v1');
+    assertApi('setResponseHeader').wasCalledWith('k2', 'v2');
+    assertApi('returnResponse').wasCalled();
+- name: Client reloads fbevents JS when it is older than 20 minutes
+  code: |
+    mock('getRequestPath', () => {
+      return '/en_US/fbevents.js';
+    });
+
+    const hourAgoMillis = currentTimeMillis - (60 * 60 * 1000);
+    const expectedBody = 'const events = "js";';
+    const expectedHeaders = {'k1': 'v1'};
+
+    templateDataStorage.setItemCopy('fbevents_stored_at', hourAgoMillis);
+    templateDataStorage.setItemCopy('fbevents_js', expectedBody);
+    mock('getRequestPath', () => {
+      return '/en_US/fbevents.js';
+    });
+
+    runCode(mockConfigurationData);
+
+    const expectedStatusCode = 200;
+    capturedGetHandler(expectedStatusCode, expectedHeaders, expectedBody);
+
+    assertApi('claimRequest').wasCalled();
+    assertThat(actualGetUrl).isEqualTo('https://connect.facebook.net/en_US/fbevents.js');
+    assertThat(actualOptions).isEqualTo({timeout: 5000});
+    assertApi('setResponseStatus').wasCalledWith(expectedStatusCode);
+    assertApi('setResponseBody').wasCalledWith(expectedBody);
+    assertApi('setResponseHeader').wasCalledWith('k1', 'v1');
+    assertApi('returnResponse').wasCalled();
+    assertThat(templateDataStorage.getItemCopy('fbevents_stored_at')).isEqualTo(currentTimeMillis);
+    assertThat(templateDataStorage.getItemCopy('fbevents_js')).isEqualTo(expectedBody);
+    assertThat(templateDataStorage.getItemCopy('fbevents_headers')).isEqualTo(expectedHeaders);
 setup: |-
   // Arrange
   const makeInteger = require('makeInteger');
@@ -437,6 +600,28 @@ setup: |-
       actualEventModel = calledEventModel;
       onComplete();
     });
+
+
+  let capturedGetHandler;
+  let actualGetUrl;
+  let actualOptions;
+  mock('sendHttpGet', (url, getHandler, options) => {
+    actualGetUrl = url;
+    capturedGetHandler = getHandler;
+    actualOptions = options;
+  });
+
+  mock('setResponseStatus');
+  mock('setResponseBody');
+  mock('setResponseHeader');
+
+  const currentTimeMillis = 1599702991120;
+  mock('getTimestampMillis', () => {
+    return currentTimeMillis;
+  });
+
+  const templateDataStorage = require('templateDataStorage');
+  templateDataStorage.clear();
 
 
 ___NOTES___
