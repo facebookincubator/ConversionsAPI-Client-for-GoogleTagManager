@@ -150,6 +150,8 @@ if(requestPath === '/tr') {
   if(params['cd[status]']) eventModel['x-fb-cd-status'] = params['cd[status]'];
   if(params['cd[delivery_category]']) eventModel['x-fb-cd-delivery_category'] = params['cd[delivery_category]'];
 
+  // For pixel events, action_source defaults to Website
+  eventModel.action_source = 'website';
 
   // Starts the  container to run the tag.
   runContainer(eventModel, () => {
@@ -534,6 +536,7 @@ setup: |-
     'ip_override': testData.ip_address,
     'user_agent': testData.user_agent,
     'test_event_code': testData.test_event_code,
+    'action_source': 'website',
 
     // user data section
     'x-fb-ud-em': testData.email,
