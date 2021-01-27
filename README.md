@@ -10,7 +10,13 @@ This template is a server-side client that can be deployed on a tagging server t
 
 # Installation
 
-TBA
+<ol>
+<li>Log into your Google Tag Manager server side container where you want to use the template.</li>
+<li>From the Workspace tab, select Templates from the left-hand menu.</li>
+<li>Click the New button in the Client templates section.</li>
+<li>On the Template Editor page, click the 3 dots in the upper right and select Import</li>
+  <li>Navigate to your local copy of the template.tpl file and add it to your workspace.</li>
+</ol>
 
 # Reporting Bugs/Feedback
 Please raise any issue on GitHub
