@@ -163,6 +163,8 @@ if(requestPath === '/tr') {
   logToConsole('Processed /tr event!');
 }
 
+data.gtmOnSuccess();
+
 
 ___SERVER_PERMISSIONS___
 
@@ -453,6 +455,14 @@ scenarios:
     assertThat(templateDataStorage.getItemCopy('fbevents_stored_at')).isEqualTo(currentTimeMillis);
     assertThat(templateDataStorage.getItemCopy('fbevents_js')).isEqualTo(expectedBody);
     assertThat(templateDataStorage.getItemCopy('fbevents_headers')).isEqualTo(expectedHeaders);
+- name: Calls gtmOnSuccess() at the end of processing
+  code: |-
+    mock('gtmOnSuccess');
+
+    // Call runCode to run the template's code.
+    runCode(testData);
+
+    assertApi('gtmOnSuccess').wasCalled();
 setup: |-
   // Arrange
   const makeInteger = require('makeInteger');
